@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BayrFlow — калькулятор ДРР / ROI</title>
+<style>
+  :root{
+    --ink:#14210f;
+    --paper:#f4f0e6;
+    --line:#2f3d2a;
+    --accent:#c96a2f;
+    --good:#3f6b32;
+    --bad:#a3372a;
+    --muted:#6b7263;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Georgia','Times New Roman',serif;
+    padding:32px 20px 80px;
+  }
+  .wrap{max-width:980px;margin:0 auto;}
+  header{border-bottom:3px solid var(--ink); padding-bottom:18px; margin-bottom:28px;}
+  .eyebrow{
+    font-family:'Courier New',monospace; letter-spacing:.14em; text-transform:uppercase;
+    font-size:12px; color:var(--accent); margin-bottom:6px;
+  }
+  h1{font-size:34px; margin:0 0 6px; font-weight:700;}
+  .sub{color:var(--muted); font-size:15px; max-width:640px; font-family:Arial,sans-serif;}
+
+  .grid{display:grid; grid-template-columns:1.1fr 1fr; gap:28px;}
+  @media (max-width:800px){ .grid{grid-template-columns:1fr;} }
+
+  .card{
+    background:#fffdf7; border:1px solid var(--line); padding:22px;
+  }
+  .card h2{
+    font-family:'Courier New',monospace; font-size:13px; text-transform:uppercase;
+    letter-spacing:.1em; margin:0 0 16px; color:var(--ink); border-bottom:1px solid #ddd6c4; padding-bottom:8px;
+  }
+
+  table{width:100%; border-collapse:collapse; font-family:Arial,sans-serif; font-size:13.5px;}
+  th{
+    text-align:left; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--muted); padding:6px 6px; border-bottom:2px solid var(--ink);
+  }
+  td{padding:6px 6px; border-bottom:1px solid #e6e1d2; vertical-align:middle;}
+  input[type=text], input[type=number]{
+    width:100%; border:1px solid #cfc7b0; background:#fff; padding:6px 7px;
+    font-family:Arial,sans-serif; font-size:13.5px; color:var(--ink);
+  }
+  input:focus{outline:2px solid var(--accent); outline-offset:1px;}
+  .del{
+    background:none;border:none;color:var(--bad);cursor:pointer;font-size:16px;font-family:Arial,sans-serif;
+  }
+  .del:hover{text-decoration:underline;}
+  .addrow{
+    margin-top:10px; background:none; border:1px dashed var(--line); color:var(--ink);
+    padding:7px 12px; font-family:Arial,sans-serif; font-size:13px; cursor:pointer;
+  }
+  .addrow:hover{background:#efe9d8;}
+
+  .metric{display:flex; justify-content:space-between; align-items:baseline; padding:10px 0; border-bottom:1px solid #e6e1d2;}
+  .metric:last-child{border-bottom:none;}
+  .metric .label{font-family:Arial,sans-serif; font-size:13px; color:var(--muted);}
+  .metric .value{font-size:22px; font-weight:700;}
+  .value.good{color:var(--good);}
+  .value.bad{color:var(--bad);}
+
+  .planfact{margin-top:22px;}
+  .barwrap{background:#e9e3d2; height:10px; margin-top:6px; position:relative;}
+  .bar{position:absolute; top:0; left:0; height:10px; background:var(--ink);}
+  .bar.over{background:var(--bad);}
+  .planrow{font-family:Arial,sans-serif; font-size:12.5px; color:var(--muted); margin-top:4px; display:flex; justify-content:space-between;}
+
+  footer{
+    margin-top:40px; font-family:Arial,sans-serif; font-size:12px; color:var(--muted);
+    border-top:1px solid #ddd6c4; padding-top:14px;
+  }
+  .num{font-variant-numeric:tabular-nums;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">BayrFlow · рабочий прототип</div>
+    <h1>Калькулятор ДРР и ROI по размещениям</h1>
+    <div class="sub">Занесите площадки, расход и выручку — снизу считается ДРР, ROI и план-факт по бюджету на лету, без Excel.</div>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Размещения</h2>
+      <table>
+        <thead>
+          <tr><th>Площадка</th><th style="width:110px">Расход, ₽</th><th style="width:110px">Выручка, ₽</th><th style="width:24px"></th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <button class="addrow" id="addRow">+ добавить размещение</button>
+
+      <div class="planfact">
+        <h2 style="margin-top:22px;">План-факт по бюджету</h2>
+        <div style="font-family:Arial, sans-serif; font-size:13px;">
+          План на период, ₽:
+          <input type="number" id="planBudget" value="150000" style="width:130px; display:inline-block; margin-left:6px;">
+        </div>
+        <div class="barwrap"><div class="bar" id="planBar"></div></div>
+        <div class="planrow"><span id="factSpend">факт: 0 ₽</span><span id="planPct">0%</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Итог</h2>
+      <div class="metric"><span class="label">Суммарный расход</span><span class="value num" id="totalSpend">0 ₽</span></div>
+      <div class="metric"><span class="label">Суммарная выручка</span><span class="value num" id="totalRevenue">0 ₽</span></div>
+      <div class="metric"><span class="label">ДРР (расход/выручка)</span><span class="value num" id="drr">0%</span></div>
+      <div class="metric"><span class="label">ROI ((выручка−расход)/расход)</span><span class="value num" id="roi">0%</span></div>
+
+      <h2 style="margin-top:22px;">Лучшая / худшая площадка по ДРР</h2>
+      <div class="metric"><span class="label">Лучшая</span><span class="value num" id="bestPl" style="font-size:15px;">—</span></div>
+      <div class="metric"><span class="label">Худшая</span><span class="value num" id="worstPl" style="font-size:15px;">—</span></div>
+    </div>
+  </div>
+
+  <footer>
+    Прототип для практического задания · формулы: ДРР = Расход ÷ Выручка × 100%, ROI = (Выручка − Расход) ÷ Расход × 100% · все расчёты выполняются в браузере, данные никуда не отправляются
+  </footer>
+</div>
+
+<script>
+  const rowsEl = document.getElementById('rows');
+  let data = [
+    {name:'VK Ads', spend:32000, revenue:118000},
+    {name:'Telegram — блогер А', spend:45000, revenue:96000},
+    {name:'Yandex Директ', spend:21000, revenue:73000},
+  ];
+
+  function fmt(n){ return Math.round(n).toLocaleString('ru-RU') + ' ₽'; }
+
+  function render(){
+    rowsEl.innerHTML = '';
+    data.forEach((row, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" value="${row.name}" data-i="${i}" data-f="name"></td>
+        <td><input type="number" value="${row.spend}" data-i="${i}" data-f="spend"></td>
+        <td><input type="number" value="${row.revenue}" data-i="${i}" data-f="revenue"></td>
+        <td><button class="del" data-i="${i}" title="удалить">✕</button></td>
+      `;
+      rowsEl.appendChild(tr);
+    });
+
+    rowsEl.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('input', e => {
+        const i = +e.target.dataset.i, f = e.target.dataset.f;
+        data[i][f] = f === 'name' ? e.target.value : (parseFloat(e.target.value) || 0);
+        compute();
+      });
+    });
+    rowsEl.querySelectorAll('.del').forEach(btn => {
+      btn.addEventListener('click', e => {
+        data.splice(+e.target.dataset.i, 1);
+        render(); compute();
+      });
+    });
+    compute();
+  }
+
+  function compute(){
+    let spend = 0, revenue = 0;
+    let best = null, worst = null;
+    data.forEach(r => {
+      spend += r.spend; revenue += r.revenue;
+      const drr = r.revenue > 0 ? r.spend / r.revenue * 100 : Infinity;
+      if (!best || drr < best.drr) best = {name:r.name, drr};
+      if (!worst || drr > worst.drr) worst = {name:r.name, drr};
+    });
+    const drr = revenue > 0 ? spend / revenue * 100 : 0;
+    const roi = spend > 0 ? (revenue - spend) / spend * 100 : 0;
+
+    document.getElementById('totalSpend').textContent = fmt(spend);
+    document.getElementById('totalRevenue').textContent = fmt(revenue);
+    const drrEl = document.getElementById('drr');
+    drrEl.textContent = drr.toFixed(1) + '%';
+    drrEl.className = 'value num ' + (drr <= 30 ? 'good' : 'bad');
+    const roiEl = document.getElementById('roi');
+    roiEl.textContent = (roi >= 0 ? '+' : '') + roi.toFixed(1) + '%';
+    roiEl.className = 'value num ' + (roi >= 0 ? 'good' : 'bad');
+
+    document.getElementById('bestPl').textContent = best ? `${best.name} (ДРР ${best.drr.toFixed(1)}%)` : '—';
+    document.getElementById('worstPl').textContent = worst ? `${worst.name} (ДРР ${isFinite(worst.drr) ? worst.drr.toFixed(1)+'%' : 'н/д'})` : '—';
+
+    const plan = parseFloat(document.getElementById('planBudget').value) || 0;
+    const pct = plan > 0 ? Math.min(spend / plan * 100, 999) : 0;
+    const bar = document.getElementById('planBar');
+    bar.style.width = Math.min(pct,100) + '%';
+    bar.className = 'bar' + (spend > plan ? ' over' : '');
+    document.getElementById('factSpend').textContent = `факт: ${fmt(spend)} из плана ${fmt(plan)}`;
+    document.getElementById('planPct').textContent = pct.toFixed(0) + '%';
+  }
+
+  document.getElementById('addRow').addEventListener('click', () => {
+    data.push({name:'Новая площадка', spend:0, revenue:0});
+    render();
+  });
+  document.getElementById('planBudget').addEventListener('input', compute);
+
+  render();
+</script>
+</body>
+</html>
